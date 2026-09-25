@@ -8,6 +8,26 @@ class Organization(models.Model):
     name = models.CharField(max_length=150,unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class OrganizationMembership(models.Model):
+    class Role(models.TextChoices):
+        OWNER = "OWNER", "Owner"
+        ADMIN = "ADMIN", "Admin"
+        SERVICE_MANAGER = "SERVICE_MANAGER", "Service Manager"
+        TEAM_MANAGER = "TEAM_MANAGER", "Team Manager"
+        SENIOR_ENGINEER = "SENIOR_ENGINEER", "Senior Engineer"
+        JUNIOR_ENGINEER = "JUNIOR_ENGINEER", "Junior Engineer"
+        INTERN = "INTERN", "Intern"
+        VIEWER = "VIEWER", "Viewer"
+        TECHNICIAN = "TECHNICIAN","Technician"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='organization_memberships')
+    organization = models.ForeignKey(Organization,on_delete=models.CASCADE,related_name='memberships')
+    role = models.CharField(max_length=20,choices=Role.choices)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+            constraints = [ models.UniqueConstraint(fields=['user','organization'],name = 'unique_organization_user') ]
+
 
 class Service(models.Model):
 
