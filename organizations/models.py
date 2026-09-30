@@ -8,6 +8,9 @@ class Organization(models.Model):
     name = models.CharField(max_length=150,unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.name
+
 class OrganizationMembership(models.Model):
     class Role(models.TextChoices):
         OWNER = "OWNER", "Owner"
