@@ -21,7 +21,7 @@ class OrganizationMembership(models.Model):
         JUNIOR_ENGINEER = "JUNIOR_ENGINEER", "Junior Engineer"
         INTERN = "INTERN", "Intern"
         VIEWER = "VIEWER", "Viewer"
-        TECHNICIAN = "TECHNICIAN","Technician"
+        
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='organization_memberships')
     organization = models.ForeignKey(Organization,on_delete=models.CASCADE,related_name='memberships')
@@ -60,6 +60,26 @@ class Service(models.Model):
     def __str__(self):
         return self.name
 
+class ServiceMembership(models.Model):
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.CASCADE,
+        related_name="memberships"
+    )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="service_membership"
+    )
+
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.service.name} - {self.user.name}"
+
+
+    
 class Team(models.Model):
 
     name = models.CharField(max_length=100)

@@ -23,11 +23,20 @@ class Incident(models.Model):
         RESOLVED = "RESOLVED", "Resolved"
         REOPENED = "REOPENED", "Reopened"
 
-    team = models.ForeignKey(Team,on_delete=models.SET_NULL,null=True,blank=True,related_name='incidents')
+    ALLOWED_TRANSITIONS={
+        Status.OPEN :[Status.INVESTIGATING],
+        Status.INVESTIGATING :[Status.MITIGATED],
+        Status.MITIGATED :[Status.RESOLVED],
+        Status.RESOLVED :[Status.REOPENED],
+        Status.REOPENED :[Status.INVESTIGATING],
+    }
+
+    team = models.ForeignKey(Team,on_delete=models.PROTECT,related_name='incidents')
     title = models.CharField(max_length=200)
     description = models.TextField()
     severity = models.CharField(max_length=4,choices=Severity.choices,default=Severity.SEV4)
     status = models.CharField(max_length=20,choices=Status.choices,default=Status.OPEN)
+    tags = models.JSONField(default=list,blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -58,6 +67,18 @@ class Incident(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
 
+    def change_status(self,new_status):
+        allowed_status = self.ALLOWED_TRANSITIONS.get(self.status,[])
+
+        if new_status not in allowed_status:
+            raise ValueError(
+                f"Cannot change status from {self.status} to {new_status}"
+            )
+
+        self.status = new_status
+        self.save(update_fields=["status"])
+
+
     def __str__(self):
         return self.title
 
@@ -68,9 +89,7 @@ class IncidentEvent(models.Model):
         SEVERITY_CHANGED = "SEVERITY_CHANGED", "Severity Changed"
         ASSIGNED = "ASSIGNED", "Assigned"
         UNASSIGNED = "UNASSIGNED", "Unassigned"
-        COMMENTED = "COMMENTED", "Commented"
-        RESOLVED = "RESOLVED", "Resolved"
-        REOPENED = "REOPENED", "Reopened"
+        TEAM_CHANGED = "TEAM_CHANGED", "Team Changed"
 
     incident = models.ForeignKey(Incident,on_delete=models.CASCADE,related_name='events')
     actor = models.ForeignKey(
@@ -93,7 +112,6 @@ class IncidentComment(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='incident_comments')
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"comment by {self.author} on {self.incident.title}"
