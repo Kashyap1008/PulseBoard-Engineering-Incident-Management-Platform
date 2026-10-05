@@ -8,6 +8,7 @@ from .models import Incident,IncidentEvent,IncidentComment
 from .permissions import IsIncidentOrganizationMember,CanAssignIncident,CanChangeIncidentTeam,CanCommentOnIncident
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from audit.models import AuditLog
 
 from .serializers import IncidentSerializer,IncidentTranistionSerializer,IncidentAssignmentSerializer,IncidentTeamSerializer,IncidentServeritySerializer,IncidentEventSerializer,IncidentCommentSerializer
 
@@ -28,6 +29,14 @@ class IncidentListCreateView(generics.ListCreateAPIView):
             message = "Incident Created",
             meta_data = {}
         )
+        AuditLog.objects.create(
+            actor =self.request.user,
+            action = AuditLog.ACTION.INCIDENT_CREATED,
+            target_type = "Incident",
+            target_id = incident.id,
+            message =  f"Incident {incident.title} was created by {self.request.user}'",
+            meta_data = {}
+        )
 
 class IncidentDetailView(generics.RetrieveAPIView):
     serializer_class = IncidentSerializer
@@ -35,6 +44,8 @@ class IncidentDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
             return Incident.objects.filter(team__organization__memberships__user = self.request.user)
+
+    
 
 class IncidentTransitionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -62,6 +73,17 @@ class IncidentTransitionView(APIView):
                 "new_status":new_status
             }
         )
+        AuditLog.objects.create(
+                    actor =request.user,
+                    action = AuditLog.ACTION.INCIDENT_STATUS_CHANGED,
+                    target_type = "Incident",
+                    target_id = incident.id,
+                    message =  f"incident status changed from {old_status} to {new_status}",
+                    meta_data = {
+                        "old_status": old_status,
+                        "new_status": new_status
+                    }
+                )
 
 
         return Response(
@@ -87,6 +109,7 @@ class IncidentAssignmentView(APIView):
 
         assignee_id = serializer.validated_data["assignee"]
         if assignee_id is None:
+            old_assignee = incident.assignee
             incident.assignee = None
             incident.save(update_fields=["assignee","updated_at"])
             IncidentEvent.objects.create(
@@ -96,7 +119,22 @@ class IncidentAssignmentView(APIView):
                 message = "incident unassigned",
                 meta_data = {}
                 )
+            AuditLog.objects.create(
+                    actor =request.user,
+                    action = AuditLog.ACTION.INCIDENT_UNASSIGNED,
+                    target_type = "Incident",
+                    target_id = incident.id,
+                    message =  f"incident unassigned",
+                    meta_data = {
+                        "old_assignee": old_assignee,
+                        "new_assignee": None
+                    }
+                )  
         else:
+            if old_assignee is None:
+                action = AuditLog.ACTION.INCIDENT_ASSIGNED
+            else:
+                action = AuditLog.ACTION.INCIDENT_ASSIGNEE_CHANGED
             incident.assignee_id = assignee_id
             incident.save(update_fields=["assignee","updated_at"])
             incident.refresh_from_db() 
@@ -107,10 +145,14 @@ class IncidentAssignmentView(APIView):
                 message = f"incident assigned to user {incident.assignee.name}",
                 meta_data = {"assignee": assignee_id}
                 )
-
-            
-        
-
+            AuditLog.objects.create(
+                actor =request.user,
+                action = action,
+                target_type = "Incident",
+                target_id = incident.id,
+                message =  f"incident assigned to user {incident.assignee.name}",
+                meta_data = {"assignee": assignee_id}
+            )
         return Response(
             IncidentSerializer(incident).data,
             status=status.HTTP_200_OK
@@ -148,6 +190,17 @@ class IncidentTeamView(APIView):
                 "new_team": new_team
             }
 
+        )
+        AuditLog.objects.create(
+            actor =request.user,
+            action = AuditLog.ACTION.INCIDENT_TEAM_CHANGED,
+            target_type = "Incident",
+            target_id = incident.id,
+            message = f"Incident team changed from {old_team.name} to {incident.team.name}",
+            meta_data = {
+                "old_team": old_team.id,
+                "new_team": new_team
+            }
         )
 
         return Response(
@@ -191,6 +244,17 @@ class IncidentSeverityView(APIView):
                     "new_severity": new_severity
                 }
                 )
+        AuditLog.objects.create(
+                    actor = request.user,
+                    action = AuditLog.ACTION.INCIDENT_SEVERITY_CHANGED,
+                    target_type = "Incident",
+                    target_id = incident.id,
+                    message =  f"Incident severity changed from {old_severity} to {incident.severity}",
+                    meta_data = {
+                        "old_severity": old_severity,
+                        "new_severity": new_severity
+                    }
+                )
 
         return Response(
             IncidentSerializer(incident).data,
@@ -208,7 +272,7 @@ class IncidentTimelineView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        events = IncidentEvent.objects.filter(incident=incident).order_by("created_at")
+        events = IncidentEvent.objects.filter(incident=incident).order_by("-created_at")
 
         serializer = IncidentEventSerializer(events,many=True)
 
