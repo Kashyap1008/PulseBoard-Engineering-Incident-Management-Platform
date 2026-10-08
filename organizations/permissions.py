@@ -12,5 +12,9 @@ class IsOrganizationMember(BasePermission):
         
         return request.user.organization_memberships.filter(
             organization__id = organization_id
-        ).exists()
+        ).exists()  
+
+class IsOrganizationOwner(BasePermission):
+    def has_permission(self, request, view):
+        return True
 

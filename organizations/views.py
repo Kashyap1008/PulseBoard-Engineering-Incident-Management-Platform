@@ -4,9 +4,9 @@ from audit.models import AuditLog
 
 from rest_framework import generics 
 from rest_framework.permissions import IsAuthenticated
-from.permissions import IsOrganizationMember
+from.permissions import IsOrganizationMember,IsOrganizationOwner
 from .models import Organization,OrganizationMembership,Team,TeamMembership
-from .serializers import OrganizationSerializer,TeamSerializer
+from .serializers import OrganizationSerializer,TeamSerializer,OrganizationMembersSerializer
 
 class OrganizationListCreateView(generics.ListCreateAPIView):
     serializer_class = OrganizationSerializer
@@ -26,9 +26,30 @@ class OrganizationListCreateView(generics.ListCreateAPIView):
             target_type = "Organization",
             target_id = organization.id,
             message = f"Organization '{organization.name}' was created.",
-            meta_data = {}
+            meta_data = {}  
         )
-        
+
+class OrganizationRetriveDestroyView(generics.RetrieveDestroyAPIView):
+    queryset = Organization.objects.all()
+    serializer_class =OrganizationSerializer
+    permission_classes = [IsOrganizationOwner,IsAuthenticated]
+    
+class OrganizationMembersListCreateApiView(generics.ListCreateAPIView):
+    serializer_class  =OrganizationMembersSerializer
+    permission_classes = [IsOrganizationOwner,IsAuthenticated]
+    lookup_field = 'user_id'
+
+    def get_queryset(self):
+        return OrganizationMembership.objects.filter()
+
+class OrganizationMemberRetrieveDestroyView(generics.RetrieveDestroyAPIView):
+    queryset = queryset = Organization.objects.all()
+    serializer_class=OrganizationMembersSerializer
+    queryset = OrganizationMembership.objects.all()
+    
+
+
+
 class TeamListCreateView(generics.ListCreateAPIView):
     serializer_class = TeamSerializer
     permission_classes = [IsAuthenticated,IsOrganizationMember]

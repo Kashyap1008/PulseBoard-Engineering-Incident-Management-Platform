@@ -8,6 +8,7 @@ class Incident(models.Model):
         indexes = [
         models.Index(fields=["status"]),
         models.Index(fields=["severity"]),
+        models.Index(fields=["-created_at"]),
         ]
 
     class Severity(models.TextChoices):

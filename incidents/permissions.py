@@ -31,6 +31,8 @@ class CanAssignIncident(BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
+        
+
         if obj.team is None:
             return False
         
@@ -68,7 +70,8 @@ class CanAssignIncident(BasePermission):
 
             if requester_level is None or curr_assignee_level is None:
                 return False
-
+            
+            
             return requester_level > curr_assignee_level
         try:
             target_membership = OrganizationMembership.objects.get(user_id = assignee_id , organization = obj.team.organization)
@@ -111,7 +114,7 @@ class CanChangeIncidentTeam(BasePermission):
         if not target_team_id:
             return False
 
-        return Team.objects.filter(id = target_team_id, organization = obj.team.organization).exists()
+        return Team.objects.filter(id = target_team_id , organization = obj.team.organization).exists()
 
 class CanCommentOnIncident(BasePermission):
     ALLOWED_ORG_ROLES = {

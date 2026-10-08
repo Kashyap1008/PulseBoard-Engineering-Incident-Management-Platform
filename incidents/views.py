@@ -9,16 +9,26 @@ from .permissions import IsIncidentOrganizationMember,CanAssignIncident,CanChang
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from audit.models import AuditLog
+from .filters import IncidentFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter
 
 from .serializers import IncidentSerializer,IncidentTranistionSerializer,IncidentAssignmentSerializer,IncidentTeamSerializer,IncidentServeritySerializer,IncidentEventSerializer,IncidentCommentSerializer
 
 class IncidentListCreateView(generics.ListCreateAPIView):
     serializer_class = IncidentSerializer
     permission_classes = [IsAuthenticated,IsIncidentOrganizationMember]
+    filter_backends = [DjangoFilterBackend,SearchFilter]
+    filterset_class = IncidentFilter
+    search_fields = [
+        "title",
+        "description"
+    ]
 
     def get_queryset(self):
-        return Incident.objects.filter(team__organization__memberships__user = self.request.user)
-
+        return Incident.objects.filter(
+            team__organization__memberships__user=self.request.user
+        ).order_by("-created_at")
     def perform_create(self, serializer):
         incident = serializer.save(created_by = self.request.user)
 
@@ -109,7 +119,7 @@ class IncidentAssignmentView(APIView):
 
         assignee_id = serializer.validated_data["assignee"]
         if assignee_id is None:
-            old_assignee = incident.assignee
+            old_assignee = incident.assignee_id
             incident.assignee = None
             incident.save(update_fields=["assignee","updated_at"])
             IncidentEvent.objects.create(
@@ -131,6 +141,7 @@ class IncidentAssignmentView(APIView):
                     }
                 )  
         else:
+            old_assignee = incident.assignee
             if old_assignee is None:
                 action = AuditLog.ACTION.INCIDENT_ASSIGNED
             else:
